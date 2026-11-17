@@ -2,9 +2,8 @@
 
 # Resolves, once, every moving input an Apple Silicon image is built from: the
 # signed candidate set (or, in channel mode, the set the Omarchy channel's
-# database names), the Omarchy package channel's database, the asahi-alarm
-# database, the Arch Linux ARM databases and the Arch Linux ARM root
-# filesystem. The record pins each by sha256 and names the servers they come
+# database names), the Omarchy package channel's database, the Arch Linux
+# ARM databases and the Arch Linux ARM root filesystem. The record pins each by sha256 and names the servers they come
 # from, so every build from it installs the same bytes or stops.
 
 set -euo pipefail
@@ -15,7 +14,6 @@ ALARM_ROOTFS_URL=https://ca.us.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-l
 ALARM_KEY_URL=https://raw.githubusercontent.com/archlinuxarm/archlinuxarm-keyring/91e6b11698f8df66042d56aaa56fbe9c9263847d/packager/builder.asc
 ALARM_KEY_FINGERPRINT=68B3537F39A313B3E574D06777193F152BDBE6A6
 DEFAULT_OMARCHY_SERVER='https://pkgs.omarchy.org/%s/$arch'
-DEFAULT_ASAHI_ALARM_SERVER=https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
 DEFAULT_ALARM_SERVER='https://ca.us.mirror.archlinuxarm.org/$arch/$repo'
 # The rc lane builds from the Arch Linux ARM snapshot the rc mirror list serves.
 RC_ALARM_SERVER='https://arm-rc-mirror.omarchy.org/$arch/$repo'
@@ -25,7 +23,7 @@ STABLE_ALARM_SERVER='https://arm-stable-mirror.omarchy.org/$arch/$repo'
 usage() {
   cat <<'USAGE'
 Usage: bin/mac-image-inputs resolve FILE (--candidates DIR | --channel-set) [--channel edge|rc|stable] [--recovery-app DIR]
-         [--release-tag TAG [--mac-revision N]] [--omarchy-server URL] [--asahi-alarm-server URL] [--alarm-server URL] [--cache DIR]
+         [--release-tag TAG [--mac-revision N]] [--omarchy-server URL] [--alarm-server URL] [--cache DIR]
        bin/mac-image-inputs check FILE
        bin/mac-image-inputs rootfs FILE DEST [--cache DIR]
        bin/mac-image-inputs dbs FILE DEST [--cache DIR]
@@ -103,7 +101,6 @@ record_body() {
   [[ -z ${recovery_app_manifest:-} ]] || printf 'recovery_app_manifest_sha256=%s\n' "$recovery_app_manifest"
   printf 'omarchy_channel=%s\nomarchy_server=%s\nomarchy_db_sha256=%s\n' "$omarchy_channel" "$omarchy_server" "$omarchy_db"
   [[ -z ${release_tag:-} ]] || printf 'release_tag=%s\nmac_revision=%s\n' "$release_tag" "$mac_revision"
-  printf 'asahi_alarm_server=%s\nasahi_alarm_db_sha256=%s\n' "$asahi_alarm_server" "$asahi_alarm_db"
   printf 'alarm_server=%s\n' "$alarm_server"
   for repository in "${ALARM_REPOSITORIES[@]}"; do
     printf 'alarm_%s_db_sha256=%s\n' "$repository" "${alarm_db[$repository]}"
@@ -131,7 +128,7 @@ check_release_servers() {
   local server other kind
   [[ $omarchy_channel != edge ]] || return 0
   if [[ $omarchy_channel == rc ]]; then other=stable kind="an rc image"; else other=rc kind="a stable image"; fi
-  for server in "$omarchy_server" "$asahi_alarm_server" "$alarm_server"; do
+  for server in "$omarchy_server" "$alarm_server"; do
     ! from_edge "$server" || fail "$kind takes nothing from edge: $server"
     [[ $server != */$other/* && $server != https://arm-$other-mirror.omarchy.org/* ]] ||
       fail "$kind takes nothing from $other: $server"
@@ -172,8 +169,6 @@ load_record() {
       omarchy_db_sha256) omarchy_db=$value ;;
       release_tag) release_tag=$value ;;
       mac_revision) mac_revision=$value ;;
-      asahi_alarm_server) asahi_alarm_server=$value ;;
-      asahi_alarm_db_sha256) asahi_alarm_db=$value ;;
       alarm_server) alarm_server=$value ;;
       alarm_rootfs_sha256) alarm_rootfs=$value ;;
       alarm_*_db_sha256)
@@ -202,12 +197,10 @@ load_record() {
       ${candidate_signer:-} =~ ^[0-9A-F]{40}$ &&
       ${candidate_receipt:-} =~ $hex && ${candidate_manifest:-} =~ $hex ]] || fail "$file is not an inputs record"
   fi
-  for value in "${omarchy_server:-}" "${asahi_alarm_server:-}" "${alarm_server:-}"; do
+  for value in "${omarchy_server:-}" "${alarm_server:-}"; do
     valid_server "$value" || fail "$file is not an inputs record"
   done
-  for value in "${asahi_alarm_db:-}" "${alarm_rootfs:-}"; do
-    [[ $value =~ $hex ]] || fail "$file is not an inputs record"
-  done
+  [[ ${alarm_rootfs:-} =~ $hex ]] || fail "$file is not an inputs record"
   check_release_servers
   for key in "${ALARM_REPOSITORIES[@]}"; do
     [[ ${alarm_db[$key]:-} =~ $hex ]] || fail "$file is not an inputs record"
@@ -226,7 +219,6 @@ db_url() {
 pinned_dbs() {
   local repository
   printf 'omarchy %s %s\n' "$(db_url "$omarchy_server" omarchy)" "$omarchy_db"
-  printf 'asahi-alarm %s %s\n' "$(db_url "$asahi_alarm_server" asahi-alarm)" "$asahi_alarm_db"
   for repository in "${ALARM_REPOSITORIES[@]}"; do
     printf '%s %s %s\n' "$repository" "$(db_url "$alarm_server" "$repository")" "${alarm_db[$repository]}"
   done
@@ -306,9 +298,6 @@ resolve() {
     channel_signer=$(sed -n 's/^signer=//p' <<<"$described")
     channel_manifest=$(sed -n 's/^manifest_sha256=//p' <<<"$described")
   fi
-  download "$(db_url "$asahi_alarm_server" asahi-alarm)" "$work/db/asahi-alarm.db" ||
-    fail "could not download asahi-alarm.db"
-  asahi_alarm_db=$(sha256_of "$work/db/asahi-alarm.db")
   for repository in "${ALARM_REPOSITORIES[@]}"; do
     download "$(db_url "$alarm_server" "$repository")" "$work/db/$repository.db" ||
       fail "could not download $repository.db from $alarm_server"
@@ -342,12 +331,12 @@ case $mode in
 esac
 
 positionals=()
-cache="" candidates="" channel_mode="" channel=edge omarchy_server="" asahi_alarm_server=$DEFAULT_ASAHI_ALARM_SERVER
+cache="" candidates="" channel_mode="" channel=edge omarchy_server=""
 alarm_server="" release_tag="" mac_revision=""
 recovery_app=""
 while (($#)); do
   case $1 in
-    --cache|--candidates|--channel|--recovery-app|--omarchy-server|--asahi-alarm-server|--alarm-server|--release-tag|--mac-revision)
+    --cache|--candidates|--channel|--recovery-app|--omarchy-server|--alarm-server|--release-tag|--mac-revision)
       (($# > 1)) && [[ -n $2 ]] || usage_error "$1 requires a value"
       [[ $mode == resolve || ( $1 == --cache && ( $mode == rootfs || $mode == dbs || $mode == packages ) ) ]] ||
         usage_error "$1 does not apply to $mode"
@@ -362,7 +351,6 @@ while (($#)); do
         --omarchy-server) omarchy_server=$2 ;;
         --release-tag) release_tag=$2 ;;
         --mac-revision) mac_revision=$2 ;;
-        --asahi-alarm-server) asahi_alarm_server=$2 ;;
         --alarm-server) alarm_server=$2 ;;
       esac
       shift 2
@@ -405,7 +393,7 @@ case $mode in
       alarm_server=$STABLE_ALARM_SERVER
     fi
     alarm_server=${alarm_server:-$DEFAULT_ALARM_SERVER}
-    for value in "$omarchy_server" "$asahi_alarm_server" "$alarm_server"; do
+    for value in "$omarchy_server" "$alarm_server"; do
       valid_server "$value" || usage_error "not an https server URL: $value"
     done
     check_release_servers

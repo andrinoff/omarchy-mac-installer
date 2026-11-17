@@ -32,8 +32,6 @@ cat >"$scratch/inputs" <<'EOF'
 omarchy_channel=edge
 omarchy_server=https://pkgs.omarchy.org/edge/$arch
 omarchy_db_sha256=1111111111111111111111111111111111111111111111111111111111111111
-asahi_alarm_server=https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
-asahi_alarm_db_sha256=2222222222222222222222222222222222222222222222222222222222222222
 alarm_server=https://ca.us.mirror.archlinuxarm.org/$arch/$repo
 alarm_core_db_sha256=3333333333333333333333333333333333333333333333333333333333333333
 alarm_extra_db_sha256=4444444444444444444444444444444444444444444444444444444444444444
@@ -47,9 +45,9 @@ field() {
 # ── repositories ───────────────────────────────────────────────────────────
 render_config /repos /cache >"$scratch/pacman.conf"
 sections=$(sed -n 's/^\[\(.*\)\]$/\1/p' "$scratch/pacman.conf" | paste -sd' ' -)
-[[ $sections == "options omarchy-candidates omarchy asahi-alarm core extra alarm aur omarchy-aarch64" ]] ||
+[[ $sections == "options omarchy-candidates omarchy core extra alarm aur omarchy-aarch64" ]] ||
   fail "the candidate set is first, then the channel templates' order: $sections"
-pass "the candidate set comes first, then [omarchy], asahi-alarm and Arch Linux ARM"
+pass "the candidate set comes first, then [omarchy] and Arch Linux ARM"
 
 files=$(grep -c '^Server = file://' "$scratch/pacman.conf")
 ((files == 2)) && grep -Fxq 'Server = file:///repos/omarchy-candidates' "$scratch/pacman.conf" &&
@@ -83,7 +81,7 @@ cat >"$candidates/import.json" <<'EOF'
 EOF
 [[ $(qualified uboot-aurora limine gum | paste -sd' ' -) == "omarchy-candidates/uboot-aurora limine gum" ]] ||
   fail "set packages are installed by their repository-qualified name"
-pass "a plain uboot-aurora request cannot resolve to asahi-alarm: set packages are qualified"
+pass "a plain uboot-aurora request cannot resolve to another repository: set packages are qualified"
 
 # What omarchy-pkg-defaults composes before the Apple list: base, then aarch64 when the runtime ships it.
 mkdir -p "$scratch/runtime/usr/share/omarchy/install"
@@ -214,7 +212,7 @@ target_pacman() {
   printf '%s\n' "$@" >"$scratch/requested"
   for name in omarchy omarchy-settings omarchy-mac omarchy-mac-boot linux-aurora m1n1-aurora uboot-aurora aurora-audio alsa-ucm-conf-aurora speakerguardd omarchy-aurora-firmware mesa-aurora vulkan-aurora aurora-bless; do
     if [[ $resolution == stolen && $name == uboot-aurora ]]; then
-      echo "asahi-alarm uboot-aurora 2026.07.asahi1-1"
+      echo "omarchy uboot-aurora 2026.07.aurora1-1"
     else
       echo "omarchy-candidates $name 1-1"
     fi
@@ -642,8 +640,6 @@ SigLevel = Required DatabaseOptional
 [omarchy]
 Server = https://pkgs.omarchy.org/edge/$arch
 
-[asahi-alarm]
-Server = https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
   [core]
 Include = /etc/pacman.d/mirrorlist
 # [core-debug]
@@ -654,13 +650,13 @@ Include = /etc/pacman.d/mirrorlist
 [aur]
 Include = /etc/pacman.d/mirrorlist
 CONF
-[[ $(pacman_repositories "$target/etc/pacman.conf" | paste -sd' ' -) == "omarchy asahi-alarm core extra alarm aur" ]] ||
+[[ $(pacman_repositories "$target/etc/pacman.conf" | paste -sd' ' -) == "omarchy core extra alarm aur" ]] ||
   fail "the installed configuration's repositories are read in order, comments and [options] skipped"
 fill_sync() {
   rm -rf "$sync"
   mkdir -p "$sync"
   local name
-  for name in omarchy-candidates asahi-alarm core extra alarm aur omarchy omarchy-aarch64; do
+  for name in omarchy-candidates core extra alarm aur omarchy omarchy-aarch64; do
     printf '%s database\n' "$name" >"$sync/$name.db"
   done
   : >"$sync/db.lck"
@@ -668,14 +664,14 @@ fill_sync() {
 }
 fill_sync
 pins=$(printf 'omarchy-candidates - -\n'
-  for name in asahi-alarm core extra alarm aur omarchy; do
+  for name in core extra alarm aur omarchy; do
     printf '%s %s https://%s.invalid\n' "$name" "$(sha256_of "$sync/$name.db")" "$name"
   done)
 repositories() {
   printf '%s\n' "$pins"
 }
 (fail() { builder_fail "$@"; }; keep_installed_databases) || fail "the installed repositories' databases are kept"
-[[ $(cd "$sync" && ls -A | sort | paste -sd' ' -) == "alarm.db asahi-alarm.db aur.db core.db extra.db omarchy.db" ]] ||
+[[ $(cd "$sync" && ls -A | sort | paste -sd' ' -) == "alarm.db aur.db core.db extra.db omarchy.db" ]] ||
   fail "only the installed repositories' databases are left: $(ls -A "$sync")"
 fill_sync
 printf 'moved\n' >"$sync/core.db"
@@ -728,8 +724,6 @@ channel_manifest_sha256=$(printf '8%.0s' {1..64})
 omarchy_channel=edge
 omarchy_server=https://pkgs.omarchy.org/edge/\$arch
 omarchy_db_sha256=$db_sha
-asahi_alarm_server=https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
-asahi_alarm_db_sha256=$(printf '2%.0s' {1..64})
 alarm_server=https://ca.us.mirror.archlinuxarm.org/\$arch/\$repo
 alarm_core_db_sha256=$(printf '3%.0s' {1..64})
 alarm_extra_db_sha256=$(printf '4%.0s' {1..64})
@@ -879,8 +873,6 @@ SigLevel = Required DatabaseOptional
 # [core-testing]
 [omarchy]
 Server = https://pkgs.omarchy.org/edge/$arch
-[asahi-alarm]
-Server = https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
 [core]
 Include = /etc/pacman.d/mirrorlist
 [extra]
@@ -897,7 +889,7 @@ runtime_template "$RUNTIME_TEMPLATE"
   fail() { builder_fail "$@"; }
   read_repository_order
   sections=$(render_config /repos /cache | sed -n 's/^\[\(.*\)\]$/\1/p' | paste -sd' ' -)
-  [[ $sections == "options omarchy-candidates omarchy asahi-alarm core extra alarm aur omarchy-aarch64" ]] ||
+  [[ $sections == "options omarchy-candidates omarchy core extra alarm aur omarchy-aarch64" ]] ||
     fail "a channel image searches its runtime's Apple template's order: $sections"
   [[ $(repositories | sed -n 2p) == "omarchy $db_sha https://pkgs.omarchy.org/edge/\$arch" ]] ||
     fail "[omarchy] keeps the record's database and server"
@@ -906,7 +898,7 @@ runtime_template "$RUNTIME_TEMPLATE"
   candidates=$candidates
   fail() { builder_fail "$@"; }
   read_repository_order
-  [[ ${repository_order[*]} == "omarchy asahi-alarm core extra alarm aur" ]] ||
+  [[ ${repository_order[*]} == "omarchy core extra alarm aur" ]] ||
     fail "a candidate set keeps the pinned order: ${repository_order[*]}"
 )
 pass "a channel image searches its runtime's Apple template's order; a candidate set without a template keeps the pinned order"
@@ -999,10 +991,10 @@ runtime_template "$(sed '/^\[aur\]/,$d' <<<"$RUNTIME_TEMPLATE")"
   field() { sed -n "s/^$1=//p" "$channel/inputs"; }
   fail() { builder_fail "$@"; }
   read_repository_order
-  [[ ${repository_order[*]} == "omarchy asahi-alarm core extra alarm" ]] ||
+  [[ ${repository_order[*]} == "omarchy core extra alarm" ]] ||
     fail "a template without [aur] gives its own order: ${repository_order[*]}"
   sections=$(render_config /repos /cache | sed -n 's/^\[\(.*\)\]$/\1/p' | paste -sd' ' -)
-  [[ $sections == "options omarchy-candidates omarchy asahi-alarm core extra alarm omarchy-aarch64" ]] ||
+  [[ $sections == "options omarchy-candidates omarchy core extra alarm omarchy-aarch64" ]] ||
     fail "a channel image whose template leaves out [aur] searches no [aur]: $sections"
 )
 runtime_template "$RUNTIME_TEMPLATE"
@@ -1015,11 +1007,13 @@ refused_order() {
   [[ $refusal == *"$expected"* ]] || fail "$what is refused: $refusal"
 }
 runtime_template "$(sed '/^\[extra\]/,+1d' <<<"$RUNTIME_TEMPLATE")"
-refused_order "names the repositories omarchy asahi-alarm core alarm aur, not the pinned" "a template missing a pinned repository"
+refused_order "names the repositories omarchy core alarm aur, not the pinned" "a template missing a pinned repository"
 runtime_template "$(sed -e '/^\[extra\]/,+1d' -e '/^\[aur\]/,$d' <<<"$RUNTIME_TEMPLATE")"
-refused_order "names the repositories omarchy asahi-alarm core alarm, not the pinned" "a template missing [aur] and a pinned repository"
+refused_order "names the repositories omarchy core alarm, not the pinned" "a template missing [aur] and a pinned repository"
 runtime_template "$RUNTIME_TEMPLATE"$'[omarchy-aarch64]\nServer = https://example.invalid\n'
 refused_order "not the pinned" "a template with a repository the record does not pin"
+runtime_template "$RUNTIME_TEMPLATE"$'[asahi-alarm]\nServer = https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64\n'
+refused_order "names the repositories omarchy core extra alarm aur asahi-alarm, not the pinned" "a template that still names [asahi-alarm]"
 runtime_template ""
 refused_order "the runtime ships no Apple pacman template for the channel" "a runtime without the template"
 runtime_template "$RUNTIME_TEMPLATE"
@@ -1039,7 +1033,7 @@ if command -v pacman >/dev/null 2>&1; then
   mkdir -p "$scratch/dbpath/sync"
   sync_db omarchy 0.52.0-1
   sync_db extra 0.51.1-2
-  for repository in omarchy-candidates asahi-alarm core alarm aur omarchy-aarch64; do
+  for repository in omarchy-candidates core alarm aur omarchy-aarch64; do
     bsdtar -czf "$scratch/dbpath/sync/$repository.db" --files-from /dev/null
   done
   resolved() {
@@ -1093,39 +1087,23 @@ if command -v pacman >/dev/null 2>&1; then
     'm1n1-neo|1.6.1.aurora16-1|%PROVIDES%\nm1n1=1.6.1.aurora16\n\n%CONFLICTS%\nm1n1\n\n' \
     'aurora-scripts|20261023-1|%PROVIDES%\nasahi-scripts=20261023\n\n%CONFLICTS%\nasahi-scripts\n\n%REPLACES%\nasahi-scripts\n\n' \
     'aurora-fwextract|0.9.2-1|%DEPENDS%\naurora-scripts\n\n%PROVIDES%\nasahi-fwextract=0.9.2\n\n'
-  boot_db asahi-alarm 'm1n1|1.6.1-1|' 'uboot-asahi|2026.07.asahi2-1|' 'asahi-scripts|20260127.1-1|'
   {
     printf '[options]\nArchitecture = aarch64\nSigLevel = Never\n'
-    for repository in omarchy-candidates omarchy asahi-alarm; do
+    for repository in omarchy-candidates omarchy; do
       printf '[%s]\nServer = file:///nonexistent/%s\n' "$repository" "$repository"
     done
   } >"$scratch/boot.conf"
   boot_resolved() {
     pacman --config "$scratch/boot.conf" --dbpath "$scratch/boot-dbpath" --noconfirm -Sp --print-format '%r %n' "$@" 2>&1 | sort
   }
-  # The boot set with the scripts tool select_platform_tools picks for the lane's [omarchy].
-  boot_set() {
-    (repos=$scratch/boot-repos; mkdir -p "$repos/omarchy"; cp "$scratch/boot-dbpath/sync/omarchy.db" "$repos/omarchy/"
-      fail() { builder_fail "$@"; }; select_platform_tools
-      printf '%s\n' omarchy-candidates/m1n1-aurora omarchy-candidates/uboot-aurora omarchy-candidates/omarchy-mac-boot "$(platform_tool aurora-scripts)")
-  }
-  boot_check() { # boot_check <expected scripts line> <what>
-    local set
-    mapfile -t set < <(boot_set)
-    [[ $(boot_resolved "${set[@]}") == "$1"$'\nomarchy-candidates m1n1-aurora\nomarchy-candidates omarchy-mac-boot\nomarchy-candidates uboot-aurora' ]] ||
-      fail "$2: $(boot_resolved "${set[@]}")"
-  }
-  boot_check "omarchy aurora-scripts" "an edge-like lane's boot transaction takes aurora-scripts from [omarchy] and nothing it replaces"
-  # Without uboot-aurora in the same transaction the virtual dependency takes the
-  # stock uboot-asahi, which the pre-check refuses.
-  grep -Fxq 'asahi-alarm uboot-asahi' <<<"$(boot_resolved omarchy-candidates/m1n1-aurora)" ||
-    fail "m1n1-aurora alone pulls the stock uboot-asahi: $(boot_resolved omarchy-candidates/m1n1-aurora)"
-  # An rc-like lane, whose [omarchy] does not carry aurora-scripts yet, takes asahi-alarm's.
-  boot_db omarchy \
-    'aura|0.1.0.r20261023-1|%PROVIDES%\nm1n1=1.6.1.aurora19\nm1n1-aurora=1.6.1.aurora19\nm1n1-neo=1.6.1.aurora19\n\n%CONFLICTS%\nm1n1\nm1n1-aurora\nm1n1-neo\n\n' \
-    'm1n1-neo|1.6.1.aurora16-1|%PROVIDES%\nm1n1=1.6.1.aurora16\n\n%CONFLICTS%\nm1n1\n\n'
-  boot_check "asahi-alarm asahi-scripts" "an rc-like lane's boot transaction takes asahi-alarm's asahi-scripts"
-  pass "pacman resolves the boot set to m1n1-aurora, uboot-aurora and the lane's scripts tool (aurora-scripts from [omarchy], else asahi-alarm's), never aura, m1n1-neo, m1n1 or uboot-asahi"
+  boot_set=(omarchy-candidates/m1n1-aurora omarchy-candidates/uboot-aurora omarchy-candidates/omarchy-mac-boot aurora-scripts)
+  expected=$'omarchy aurora-scripts\nomarchy-candidates m1n1-aurora\nomarchy-candidates omarchy-mac-boot\nomarchy-candidates uboot-aurora'
+  [[ $(boot_resolved "${boot_set[@]}") == "$expected" ]] ||
+    fail "the boot transaction resolves to m1n1-aurora, uboot-aurora, aurora-scripts and nothing they replace: $(boot_resolved "${boot_set[@]}")"
+  # No pinned repository carries the stock uboot-asahi: m1n1-aurora alone takes uboot-aurora.
+  grep -Fxq 'omarchy-candidates uboot-aurora' <<<"$(boot_resolved omarchy-candidates/m1n1-aurora)" ||
+    fail "m1n1-aurora alone pulls uboot-aurora: $(boot_resolved omarchy-candidates/m1n1-aurora)"
+  pass "pacman resolves the boot set to m1n1-aurora, uboot-aurora and aurora-scripts, never aura, m1n1-neo, m1n1, uboot-asahi or asahi-scripts"
   # Edge (omacom/omarchy-pkgs#3025): [omarchy-candidates] holds aura, never m1n1-aurora, the Stage 1 source.
   rm -rf "$scratch/boot-dbpath" "$scratch"/boot-db-*
   boot_db omarchy-candidates \
@@ -1136,7 +1114,6 @@ if command -v pacman >/dev/null 2>&1; then
   boot_db omarchy \
     'm1n1-aurora|1.6.1.aurora23-4|%PROVIDES%\nm1n1=1.6.1.aurora23\nm1n1-neo=1.6.1.aurora23\n\n%CONFLICTS%\nm1n1\naura\nm1n1-neo\n\n%REPLACES%\nm1n1-neo\n\n' \
     'aurora-scripts|20260127.1-1|%PROVIDES%\nasahi-scripts=20260127.1\n\n'
-  boot_db asahi-alarm 'm1n1|1.6.1-1|' 'uboot-asahi|2026.07.asahi2-1|' 'asahi-scripts|20260127.1-1|'
   expected=$'omarchy aurora-scripts\nomarchy-candidates aura\nomarchy-candidates linux-aurora\nomarchy-candidates omarchy-mac-boot\nomarchy-candidates uboot-aurora'
   resolved=$(boot_resolved omarchy-candidates/aura omarchy-candidates/linux-aurora omarchy-candidates/uboot-aurora omarchy-candidates/omarchy-mac-boot)
   [[ $resolved == "$expected" ]] || fail "the edge boot transaction resolves to aura with the 7.3 kernel, never m1n1-aurora: $resolved"

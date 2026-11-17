@@ -25,7 +25,7 @@ sha() {
 
 mkdir -p "$work/cache/db"
 declare -A digest=()
-for repository in omarchy asahi-alarm core extra alarm aur; do
+for repository in omarchy core extra alarm aur; do
   printf '%s database\n' "$repository" >"$work/$repository.db"
   digest[$repository]=$(sha "$work/$repository.db")
   cp "$work/$repository.db" "$work/cache/db/${digest[$repository]}.db"
@@ -44,8 +44,6 @@ candidate_manifest_sha256=$(hex 2)
 omarchy_channel=edge
 omarchy_server=https://pkgs.omarchy.org/edge/\$arch
 omarchy_db_sha256=${digest[omarchy]}
-asahi_alarm_server=https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64
-asahi_alarm_db_sha256=${digest[asahi-alarm]}
 alarm_server=https://ca.us.mirror.archlinuxarm.org/\$arch/\$repo
 alarm_core_db_sha256=${digest[core]}
 alarm_extra_db_sha256=${digest[extra]}
@@ -81,7 +79,7 @@ refuse "the mx-mac record format" sed 's/^format=2$/format=1/' "$work/inputs"
 
 mkdir "$work/dbs"
 "$BASH" "$inputs" dbs "$work/inputs" "$work/dbs" --cache "$work/cache" >/dev/null || fail "dbs from the cache"
-for repository in omarchy asahi-alarm core extra alarm aur; do
+for repository in omarchy core extra alarm aur; do
   cmp -s "$work/$repository.db" "$work/dbs/$repository.db" || fail "$repository.db is the pinned database"
 done
 pass "dbs puts every pinned database in place from the cache"

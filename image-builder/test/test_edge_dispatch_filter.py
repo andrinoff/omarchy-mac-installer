@@ -42,8 +42,8 @@ def write_repo(path: Path, packages: dict[str, dict]) -> Path:
     return path
 
 
-EDGE_ORDER = ("omarchy", "asahi-alarm", "core", "extra", "alarm", "aur")
-LAST_ORDER = ("asahi-alarm", "core", "extra", "alarm", "aur", "omarchy")
+EDGE_ORDER = ("omarchy", "core", "extra", "alarm", "aur")
+LAST_ORDER = ("core", "extra", "alarm", "aur", "omarchy")
 
 
 def template(order) -> bytes:
@@ -103,7 +103,7 @@ class EdgeDispatchFilterTest(unittest.TestCase):
         write_repo(cls.repos / "extra.db", {"hyprland": {}, "mesa": {"provides": ["vulkan-driver"]},
                                             "walker": {"version": "1.0-1"}, "libthing": {"version": "3.0-1"},
                                             "zram-tools": {"provides": ["zram-generator"]}})
-        for name in ("asahi-alarm", "core", "alarm", "aur"):
+        for name in ("core", "alarm", "aur"):
             write_repo(cls.repos / f"{name}.db", {f"{name}-placeholder": {}})
 
     @classmethod
@@ -179,9 +179,9 @@ class EdgeDispatchFilterTest(unittest.TestCase):
         for name, text, message in (
                 ("missing", False, "no Apple pacman template"),
                 ("short", template(tuple(n for n in EDGE_ORDER if n != "extra")),
-                 "names the repositories omarchy asahi-alarm core alarm aur, not"),
+                 "names the repositories omarchy core alarm aur, not"),
                 ("short-without-aur", template(tuple(n for n in EDGE_ORDER if n not in ("extra", "aur"))),
-                 "names the repositories omarchy asahi-alarm core alarm, not"),
+                 "names the repositories omarchy core alarm, not"),
                 ("extra", template(EDGE_ORDER + ("testing",)), "not the pinned"),
                 ("crlf-missing", template(EDGE_ORDER[1:]).replace(b"\n", b"\r\n"), "not the pinned")):
             with self.subTest(name), self.assertRaisesRegex(ValueError, message):
