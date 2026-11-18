@@ -716,7 +716,7 @@ channel=$scratch/channel
 mkdir -p "$channel/candidates" "$channel/target"
 db_sha=$(printf '7%.0s' {1..64})
 cat >"$channel/inputs" <<EOF2
-format=2
+format=3
 resolved_at=2026-10-14T00:00:00Z
 channel_set=omarchy-edge-${db_sha:0:12}
 channel_signer=40DFB630FF42BCFFB047046CF0134EE680CAC571
@@ -732,6 +732,17 @@ alarm_aur_db_sha256=$(printf '6%.0s' {1..64})
 alarm_rootfs_sha256=$(printf '9%.0s' {1..64})
 EOF2
 "$BASH" "$here/bin/mac-image-inputs" check "$channel/inputs" >/dev/null || fail "the channel fixture is a canonical record"
+# A format 2 record, which pins asahi-alarm, loads but does not build here.
+sed -e 's/^format=3$/format=2/' -e "s|^omarchy_db_sha256=.*|&\\
+asahi_alarm_server=https://github.com/asahi-alarm/asahi-alarm/releases/download/aarch64\\
+asahi_alarm_db_sha256=$(printf '2%.0s' {1..64})|" "$channel/inputs" >"$scratch/inputs-v2"
+"$BASH" "$here/bin/mac-image-inputs" check "$scratch/inputs-v2" >/dev/null || fail "the format 2 fixture is a canonical record"
+refusal=$( (for tool in docker curl gpg python3 bsdtar sha256sum; do eval "$tool() { :; }"; done
+  fail() { builder_fail "$@"; }; host_main --inputs "$scratch/inputs-v2" "$scratch/out-v2") 2>&1 >/dev/null) &&
+  fail "a format 2 record builds"
+[[ $refusal == *"is a format 2 inputs record, which pins asahi-alarm: build it with the builder that resolved it"* ]] ||
+  fail "a format 2 record is refused with its replay path: $refusal"
+pass "a format 2 record checks, and the builder sends it to the builder that resolved it"
 cat >"$channel/candidates/import.json" <<'EOF2'
 {"kind": "channel", "candidate_only": false, "packages": [
   {"name": "omarchy-dev", "role": "omarchy", "version": "4.0.0.r6971.g492b883-1", "filename": "d.pkg.tar.zst", "group": "runtime"},

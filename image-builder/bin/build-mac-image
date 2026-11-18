@@ -242,6 +242,10 @@ host_main() {
     command -v "$tool" >/dev/null 2>&1 || fail "missing command: $tool"
   done
   "$BASH" "$ROOT/bin/mac-image-inputs" check "$inputs" >/dev/null
+  # A format 2 record pins asahi-alarm, which this builder no longer reads: the
+  # builder that resolved it (its image's builder_commit) replays it.
+  [[ $(record_field format "$inputs") == 3 ]] ||
+    fail "$inputs is a format 2 inputs record, which pins asahi-alarm: build it with the builder that resolved it (its IMAGE's builder_commit, or mac-image.yml's builder-ref), or resolve a new record"
   inputs=$(cd -- "$(dirname -- "$inputs")" && pwd)/$(basename -- "$inputs")
   kind=$(record_kind "$inputs")
   if [[ $kind == channel ]]; then

@@ -42,7 +42,7 @@ image-builder/bin/mac-image-inputs resolve FILE --candidates DIR [--channel edge
 image-builder/bin/build-mac-image --inputs FILE --candidates DIR [--cache DIR] [--dry-run] OUT
 ```
 
-- The inputs record (format 2) pins the candidate set (its receipt and manifest sha256, source commit and signer), the Omarchy channel's `omarchy.db`, the Arch Linux ARM databases and root filesystem, and names each server. Trust comes only from files in this repository; no flag or environment variable supplies a key or a policy.
+- The inputs record (format 3; format 2 also pinned `asahi-alarm.db`, and only the builder that resolved it builds from it) pins the candidate set (its receipt and manifest sha256, source commit and signer), the Omarchy channel's `omarchy.db`, the Arch Linux ARM databases and root filesystem, and names each server. Trust comes only from files in this repository; no flag or environment variable supplies a key or a policy.
 - The candidate set is imported (verified and frozen read-only) on the host before any network access or container. The build never refreshes a database: the pinned bytes are put in place. With `--cache`, package archives are kept, so a later build from the same record installs the same bytes after the servers have moved on.
 - `OUT` receives the zip, `installer_data.json`, `INSPECTION`, `PROVENANCE`, `IMAGE`, the inputs record and the logs.
 
