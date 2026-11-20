@@ -474,7 +474,8 @@ def build_catalog(
         payload_artifact["parts"] = [
             dict(plain(part), sha256=f"sha256:{part['sha256']}") for part in payload["parts"]
         ]
-    supported, _ = supported_models.load()
+    # rc and stable offer no untested Mac; edge offers it with its note.
+    supported = supported_models.channel_supported(channel)
     untested = supported_models.untested()
     models = []
     for identifier in supported:
@@ -505,7 +506,7 @@ def build_catalog(
     }
     catalog["installer"] = installer
     catalog["models"] = models
-    errors = supported_models.catalog_errors(catalog)
+    errors = supported_models.catalog_errors(catalog, channel)
     if errors:
         raise Refusal("; ".join(errors))
     return catalog
@@ -640,16 +641,20 @@ def check_promotion_source(source: dict) -> None:
             raise Refusal(f"{image} is a final tag built on the rc lane: it is never promoted")
 
 
-def promote_catalog(source: dict, now: datetime.datetime) -> dict:
+def promote_catalog(source: dict, now: datetime.datetime, channel: str) -> dict:
     """SOURCE with only its sequence and issue time replaced: every model,
-    pin, digest and the installer block keep exactly the source's values."""
+    pin, digest and the installer block keep exactly the source's values.
+
+    A promotion re-signs the source, so it is refused unless the source is
+    exactly what CHANNEL may offer today (supported-models.json, read now):
+    no untested Mac, no preview note, no developer board."""
     if source.get("schemaVersion") != SCHEMA_VERSION:
         raise Refusal("the source catalog is not a schema 4 catalog")
     check_promotion_source(source)
     promotion_artifacts(source)
-    errors = supported_models.catalog_errors(source)
+    errors = supported_models.catalog_errors(source, channel)
     if errors:
-        raise Refusal("the source catalog does not cover every supported Mac: " + "; ".join(errors))
+        raise Refusal(f"the source catalog is not what {channel} offers: " + "; ".join(errors))
     sequence = int(now.timestamp())
     if sequence <= source["sequence"]:
         raise Refusal(f"sequence {sequence} does not follow the source catalog's {source['sequence']}")
@@ -1296,7 +1301,7 @@ def command_promote(arguments) -> None:
     source_sha256 = hashlib.sha256(source_bytes).hexdigest()
     if expected is not None and source_sha256 != expected:
         raise Refusal(f"the published {source_channel} catalog is sha256 {source_sha256}, not the pinned {expected}")
-    promoted = promote_catalog(source, now)
+    promoted = promote_catalog(source, now, channel)
     artifacts = promotion_artifacts(promoted)
     if arguments.verify_remote:
         # Read back what the catalog pins; nothing is built or uploaded.
@@ -1342,6 +1347,9 @@ def command_check_promotion(arguments) -> None:
     check_promotion_source(source)
     promoted = load_json(arguments.catalog, "catalog")
     check_same_pins(source, promoted)
+    errors = supported_models.catalog_errors(promoted, channel)
+    if errors:
+        raise Refusal(f"the promoted catalog is not what {channel} offers: " + "; ".join(errors))
     promotion_artifacts(promoted)
     print(f"promotion=checked {source_channel} to {channel}, sequence {source['sequence']} to {promoted['sequence']}")
 
