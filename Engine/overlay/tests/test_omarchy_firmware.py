@@ -63,9 +63,10 @@ UPSTREAM_IPSWS = [
           "j514map", "j516sap", "j516cap", "j516map"], "14.8.3"),
 ]
 IPSW_VERSIONS = patched_ipsws() + UPSTREAM_IPSWS
-CHIP_MIN_VER = {0x8103: "11.0", 0x8112: "12.4", 0x8122: "14.8.3", 0x8140: "26.6"}
+CHIP_MIN_VER = {0x8103: "11.0", 0x8112: "12.4", 0x8122: "14.8.3", 0x8140: "26.6",
+                0x8152: "27.2.1"}
 DEVICE_MIN = {"j313ap": "11.0", "j413ap": "12.4", "j613ap": "14.8.3",
-              "j615ap": "14.8.3", "j700ap": "26.6"}
+              "j615ap": "14.8.3", "j700ap": "26.6", "j804ap": "27.2.1"}
 TODAY = ["13.5", "14.8.3", "26.6"]
 ON_26_6_2 = dict(sys_firmware="mBoot-18000.161.10", macos_ver="26.6.2",
                  sfr_full_ver="25.7.83.0.0,0")
@@ -145,6 +146,26 @@ class DefaultFirmwareTests(unittest.TestCase):
         self.assertEqual(choose(sysinfo, device, TODAY), ("26.6", STUB_SIZE_MACOS26))
         # Its chip alone sizes the stub, as with the bundled 13.5/14.8.3 list.
         self.assertEqual(choose(sysinfo, device, ["13.5", "14.8.3"]),
+                         (None, STUB_SIZE_MACOS26))
+
+    def test_m6_macbook_pro_takes_only_27_2_1_once_its_firmware_is_there(self):
+        on_27_2_1 = dict(sys_firmware="mBoot-20457.41.3", macos_ver="27.2.1",
+                         sfr_full_ver="26.2.131.7.0,0")
+        sysinfo, device = mac("j804ap", 0x8152, **on_27_2_1)
+        selected = default_ipsw(
+            IPSW_VERSIONS, CHIP_MIN_VER, sysinfo, device,
+            metadata(["13.5", "14.8.3", "26.6.2", "27.2.1"]), split_ver)
+        self.assertEqual(selected.version, "27.2.1")
+        self.assertTrue(selected.url.endswith("UniversalMac_27.2.1_26B7131_Restore.ipsw"))
+        self.assertEqual(choose(sysinfo, device, ["27.2.1"]),
+                         ("27.2.1", STUB_SIZE_MACOS26))
+        # No other Mac's firmware is offered to it.
+        self.assertEqual(choose(sysinfo, device, TODAY + ["26.6.2"]),
+                         (None, STUB_SIZE_MACOS26))
+        # On macOS 27.0 (mBoot-20457.1.29) the system firmware is too old.
+        sysinfo, device = mac("j804ap", 0x8152, sys_firmware="mBoot-20457.1.29",
+                              macos_ver="27.0", sfr_full_ver="26.1.425.8.0,0")
+        self.assertEqual(choose(sysinfo, device, ["27.2.1"]),
                          (None, STUB_SIZE_MACOS26))
 
     def test_neo_26_6_2_selects_verified_25g83_and_keeps_legacy_available(self):

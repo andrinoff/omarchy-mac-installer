@@ -32,8 +32,9 @@ ESP_SIZE=524288000
 BOOT_SIZE=2147483648
 ROOT_SIZE=34359738368
 # Every Mac's OS firmware: the engine's per-device table picks each Mac's
-# (13.5 for M1 and M2, 14.8.3 for M3, 26.6.2 for the MacBook Neo).
-SUPPORTED_FW=(13.5 14.8.3 26.6.2)
+# (13.5 for M1 and M2, 14.8.3 for M3, 26.6.2 for the MacBook Neo, 27.2.1 for
+# the M6 MacBook Pro bring-up).
+SUPPORTED_FW=(13.5 14.8.3 26.6.2 27.2.1)
 ICON_SHA256=cf26ed5d2831db99c00d62ca046040e01a18e08e63363d629340d04ac6ec8c23
 KERNEL=linux-aurora
 # The hardware this image is for. It is written to the image-target manifest

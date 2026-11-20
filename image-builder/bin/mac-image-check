@@ -173,7 +173,7 @@ def expected_metadata(package: str, native_recovery: bool = False) -> dict:
                     {"image": "boot.img", "name": "Boot", "size": f"{BOOT_SIZE}B", "type": "Linux"},
                     {"expand": True, "image": "root.img", "name": "Root", "size": f"{ROOT_SIZE}B", "type": "Linux"},
                 ],
-                "supported_fw": ["13.5", "14.8.3", "26.6.2"],
+                "supported_fw": ["13.5", "14.8.3", "26.6.2", "27.2.1"],
             }
         ]
     }

@@ -96,7 +96,7 @@ def engine_metadata(package: str) -> dict:
     assert len(templates) == 1, "Engine/installer_data.json has exactly one full-OS target"
     # The image adds the MacBook Neo's 26.6.2, which the engine's per-device
     # table gives only to the M3 Airs and the Neo (UnifiedFirmwareTest).
-    templates[0].update(package=package, supported_fw=["13.5", "14.8.3", "26.6.2"])
+    templates[0].update(package=package, supported_fw=["13.5", "14.8.3", "26.6.2", "27.2.1"])
     return metadata
 
 
@@ -158,7 +158,7 @@ class UnifiedFirmwareTest(unittest.TestCase):
         return [ipsw.version for ipsw in avail]
 
     def test_every_mac_takes_its_own_firmware_from_the_one_image(self):
-        self.assertEqual(self.supported_fw, ["13.5", "14.8.3", "26.6.2"])
+        self.assertEqual(self.supported_fw, ["13.5", "14.8.3", "26.6.2", "27.2.1"])
         # A default install takes the last available entry, in the table's order.
         for device_class, chip_id, firmware in (("j313ap", 0x8103, "13.5"), ("j413ap", 0x8112, "13.5"),
                                                 ("j433ap", 0x8122, "14.8.3"), ("j514sap", 0x6030, "14.8.3"),
@@ -198,7 +198,7 @@ class EngineContractTest(unittest.TestCase):
                                        ("j700ap", "26.6.2")):
             with self.subTest(device_class):
                 self.assertEqual(engine_admits(metadata, payload, device_class, firmware),
-                                 [["13.5", "14.8.3", "26.6.2"]])
+                                 [["13.5", "14.8.3", "26.6.2", "27.2.1"]])
         # The engine boots a J613 on 26.6.2 through a J613 Stage 1 the image does not carry; the
         # table never makes 26.6.2 its default, and a forced pick is refused before any disk change.
         with self.assertRaisesRegex(omarchy_asahi.AsahiAdapterError, "no esp/aurora/stage1-j613.bin"):
@@ -213,7 +213,7 @@ class EngineContractTest(unittest.TestCase):
         payload = self.out / NAME
         fixtures.write_payload(payload, check.BOOT_UUID, check.ROOT_UUID, recovery_app=recovery)
         check.check_payload("edge", payload, metadata, recovery_digest=digest)
-        self.assertEqual(engine_admits(metadata, payload, "j700ap"), [["13.5", "14.8.3", "26.6.2"]])
+        self.assertEqual(engine_admits(metadata, payload, "j700ap"), [["13.5", "14.8.3", "26.6.2", "27.2.1"]])
         executable = recovery / fixtures.recovery_app.APP / "Contents/MacOS/OmarchyRecovery"
         executable.write_bytes(b"changed executable")
         fixtures.write_payload(payload, check.BOOT_UUID, check.ROOT_UUID, recovery_app=recovery)
