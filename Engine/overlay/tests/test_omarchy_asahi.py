@@ -2078,6 +2078,24 @@ class BoardStage1Tests(unittest.TestCase):
             self.assertEqual(uuid.rstrip(b"\0"), self.UUID.encode())
             self.assertEqual(path.rstrip(b"\0"), b";m1n1/boot.bin")
 
+    def test_an_m6_macbook_pro_on_27_2_1_gets_the_filled_j700_stage1_with_its_window(self):
+        import struct as _struct
+        with tempfile.TemporaryDirectory() as root:
+            target = self.write_generic(root)
+            package = {"esp/aurora/stage1-j700.bin": j700_stage1()}
+            install_board_stage1("j804ap", "27.2.1", package.__getitem__, self.UUID, str(target))
+            data = target.read_bytes()
+            self.assertTrue(data.startswith(b"m1n1 j700 stage 1"))
+            offset = data.index(b"AURORA-S1-CFG01\0") + 16
+            _, window, uuid, path = _struct.unpack_from("<II40s192s", data, offset)
+            self.assertEqual(window, 5000)
+            self.assertEqual(uuid.rstrip(b"\0"), self.UUID.encode())
+            self.assertEqual(path.rstrip(b"\0"), b";m1n1/boot.bin")
+            # Any other firmware keeps asahi's Stage 1.
+            target = self.write_generic(root)
+            install_board_stage1("j804ap", "27.0", package.__getitem__, self.UUID, str(target))
+            self.assertEqual(target.read_bytes(), b"asahi stage 1")
+
     def test_other_macs_and_older_firmware_keep_the_asahi_stage1(self):
         package = {
             "esp/aurora/stage1-j613.bin": j700_stage1(),

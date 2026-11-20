@@ -447,6 +447,13 @@ BOARD_STAGE1 = {
         "esp/aurora/stage1-j613.bin", 0, "26.6.2",
         "a 13-inch M3 MacBook Air on macOS 26.6.2",
     ),
+    # M6 bring-up, not validated: asahi's Stage 1 makes mBoot-20457.41.3
+    # panic on J804 right after it loads the custom kernel. Aurora's J700
+    # image is the first candidate; its 5 s window allows USB proxy mode.
+    "j804ap": BoardStage1(
+        "esp/aurora/stage1-j700.bin", 5000, "27.2.1",
+        "the M6 MacBook Pro (J804) on macOS 27.2.1",
+    ),
 }
 
 
