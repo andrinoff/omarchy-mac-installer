@@ -35,7 +35,7 @@ def calibration(lsci):
     gains = []
     for offsets in ((58, 62, 66), (60, 64, 68)):
         raw = [struct.unpack_from("<H", lsci, offset)[0] for offset in offsets]
-        if any(value <= 0 for value in raw):
+        if any(value == 0 for value in raw):
             raise AlsError("exbright LSCI contains a zero gain ratio")
         gains.extend([1.0] + [value / 255.0 for value in raw])
     return struct.pack("<QQ14f8x", SETUP_OPCODE, 56, *coefficients, 1.0, *gains)

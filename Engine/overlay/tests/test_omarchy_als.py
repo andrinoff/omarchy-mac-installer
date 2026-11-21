@@ -17,7 +17,7 @@ def lsci():
     struct.pack_into("<H", data, 4, 156)
     struct.pack_into("<5i", data, 28, 32768, 65536, 16384, -8192, 131072)
     for offset, value in zip((58, 62, 66, 60, 64, 68), (2040, 4080, 32640, 1785, 3825, 32385)):
-        struct.pack_into("<h", data, offset, value)
+        struct.pack_into("<H", data, offset, value)
     return bytes(data)
 
 
