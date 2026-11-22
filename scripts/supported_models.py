@@ -14,7 +14,7 @@ so check-catalog rejects it like any unknown board. `untested` marks the
 supported Macs no image has been qualified on yet, with the note a catalog
 shows for each; the testing team qualifies them on edge, and rc and stable
 never offer them. The M3 boards and the Neo have been installed and run on
-real hardware; the M4 boards and the M5 Air the engine names are untested.
+real hardware; the M4 boards the engine names are untested; the M5 Air stays developer-only.
 
 Usage:
   supported_models.py check-catalog FILE [CHANNEL]   exit 1 unless FILE covers every Mac CHANNEL offers
