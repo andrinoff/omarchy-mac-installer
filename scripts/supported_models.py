@@ -12,8 +12,9 @@ stays out and why. `developer` names each board only a developer build's
 sealed catalog may add, with its own image; channel catalogs never carry one,
 so check-catalog rejects it like any unknown board. `untested` marks the
 supported Macs no image has been qualified on yet, with the note a catalog
-shows for each; the testing team qualifies them on edge. It is empty: the
-M3 boards and the Neo have been installed and run on real hardware.
+shows for each; the testing team qualifies them on edge, and rc and stable
+never offer them. The M3 boards and the Neo have been installed and run on
+real hardware; the M4 boards and the M5 Air the engine names are untested.
 
 Usage:
   supported_models.py check-catalog FILE [CHANNEL]   exit 1 unless FILE covers every Mac CHANNEL offers
@@ -100,6 +101,19 @@ def coverage_errors(identifiers: list[str], channel: str | None = None) -> list[
     return errors
 
 
+# The first app that can finish an install through aura's Mach-O Stage 1: its
+# Recovery takes the Mach-O baseline and its Remove recognises aura's boot object
+# (omacom/omarchy-mac-installer#238). An older app partitions an M4 and then
+# stops at "The old Recovery payload inventory is invalid", so a catalog that
+# offers an untested Mac, which today is every M4 and later Mac, must refuse it.
+UNTESTED_APP_FLOOR = "2.3.17"
+
+
+def _version(value: object) -> tuple[int, ...] | None:
+    parts = value.split(".") if isinstance(value, str) else []
+    return tuple(int(part) for part in parts) if len(parts) == 3 and all(p.isdigit() for p in parts) else None
+
+
 def catalog_errors(catalog: dict, channel: str | None = None) -> list[str]:
     models = catalog.get("models")
     if not isinstance(models, list):
@@ -122,6 +136,12 @@ def catalog_errors(catalog: dict, channel: str | None = None) -> list[str]:
             for model in models
             if "previewNote" in model
         ]
+    if any("previewNote" in model for model in models):
+        installer = catalog.get("installer")
+        minimum = _version(installer.get("minimumVersion")) if isinstance(installer, dict) else None
+        if minimum is None or minimum < _version(UNTESTED_APP_FLOOR):
+            errors.append(f"a catalog offering an untested Mac needs installer.minimumVersion {UNTESTED_APP_FLOOR} "
+                          "or later, the first app that can finish an install on one")
     return errors + coverage_errors(enabled, channel)
 
 

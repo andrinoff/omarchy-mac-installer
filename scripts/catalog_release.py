@@ -320,6 +320,18 @@ def check_installer(document: object, engine: dict | None = None) -> dict:
     return document
 
 
+def check_untested_floor(installer: dict, channel: str) -> None:
+    """Refuse, before anything is uploaded, an app floor below the one a catalog
+    offering CHANNEL's untested Macs needs (supported_models.catalog_errors
+    refuses the catalog itself later). rc and stable offer no untested Mac."""
+    if channel in RELEASE_CHANNELS or not supported_models.untested():
+        return
+    floor = supported_models.UNTESTED_APP_FLOOR
+    if version_tuple(installer["minimumVersion"]) < version_tuple(floor):
+        raise Refusal(f"the {channel} catalog offers untested Macs, which need app {floor} or later: "
+                      f"installer.minimumVersion must be at least {floor}")
+
+
 def check_image_name(name: object, channel: str, payload_sha256: str | None = None) -> str:
     """NAME, an image built for CHANNEL. A name with an image id must name
     PAYLOAD_SHA256 when given; an older name without one is accepted as is.

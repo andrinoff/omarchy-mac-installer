@@ -24,6 +24,12 @@ BASE_URL = "https://downloads.example.test/releases/os-v1.0.0-mac.1.20260902"
 NOW = "2026-09-04T00:00:00Z"
 
 
+M4_AND_LATER = [
+    "apple,j604", "apple,j623", "apple,j624", "apple,j713", "apple,j715", "apple,j773g",
+    "apple,j614s", "apple,j616s", "apple,j773s", "apple,j614c", "apple,j616c", "apple,j575c",
+]
+
+
 class CatalogGeneratorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.directory = Path(
@@ -255,23 +261,26 @@ class CatalogGeneratorTests(unittest.TestCase):
     def test_refused_and_unknown_macs_are_rejected_with_a_reason(self) -> None:
         for identifier, fragment in (
             ("apple,j575d", "no j575dap device or T6032 chip"),
-            ("apple,j614s", "has been tried on a J614s"),
-            ("apple,j604", "not in scripts/supported-models.json"),
+            ("apple,j804", "not in scripts/supported-models.json"),
         ):
             document = json.loads(json.dumps(self.inputs))
             document["device_identifiers"].append(identifier)
             self.assertRejected(document, fragment)
 
-    def test_the_manifest_is_every_m1_m2_and_m3_mac_and_the_neo(self) -> None:
+    def test_the_manifest_is_every_mac_the_engine_admits(self) -> None:
         manifest = json.loads(MANIFEST.read_text())
-        self.assertEqual(len(manifest["supported"]), 35)
+        # Every M1, M2 and M3 Mac and the Neo, tested; every M4 board the engine's device
+        # table names, untested, so edge alone offers them.
+        self.assertEqual(len(manifest["supported"]), 35 + len(M4_AND_LATER))
         self.assertTrue(set(M3_MACS) <= set(manifest["supported"]))
         self.assertIn("apple,j700", manifest["supported"])
         self.assertFalse(set(M3_MACS + ["apple,j700"]) & set(manifest["untested"]),
                          "the M3 Macs and the MacBook Neo are tested")
-        self.assertEqual(set(manifest["refused"]), {"apple,j575d", "apple,j614s"})
-        # The M4 Pro and M5 Air bring-up boards, developer catalogs only.
-        self.assertEqual(set(manifest["developer"]), {"apple,j616s", "apple,j815"})
+        self.assertEqual(set(manifest["untested"]), set(M4_AND_LATER))
+        self.assertTrue(set(M4_AND_LATER) <= set(manifest["supported"]))
+        self.assertEqual(set(manifest["refused"]), {"apple,j575d"})
+        # The M5 Air, developer catalogs only until edge's U-Boot boots it (omarchy-pkgs#3231).
+        self.assertEqual(set(manifest["developer"]), {"apple,j815"})
         for template in sorted(MANIFEST.parent.glob("release-inputs*.template.json")):
             identifiers = json.loads(template.read_text())["device_identifiers"]
             self.assertEqual(
@@ -345,8 +354,8 @@ class CatalogGeneratorTests(unittest.TestCase):
     def test_a_developer_group_takes_only_developer_boards(self) -> None:
         for identifier, fragment in (
             ("apple,j293", "lists apple,j293 twice"),
-            ("apple,j614s", "not a developer board"),
-            ("apple,j604", "not a developer board"),
+            ("apple,j804", "not a developer board"),
+            ("apple,j575d", "not a developer board"),
         ):
             document = self.with_neo()
             document["developer_models"][0]["device_identifiers"] = [identifier]
