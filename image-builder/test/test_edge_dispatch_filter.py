@@ -320,26 +320,5 @@ class EdgeDispatchFilterTest(unittest.TestCase):
         self.assertIn("edge aarch64", result.stderr)
 
 
-class BuilderSeedsTest(unittest.TestCase):
-    BUILDER = Path(__file__).resolve().parents[1] / 'bin/build-mac-image'
-
-    def tools(self, seeds):
-        return [n for n in seeds if n.endswith(('-scripts', '-fwextract'))]
-
-    def test_the_tools_follow_the_builders_selection(self):
-        self.assertEqual(edge_filter.platform_tools(self.BUILDER),
-                         {'aurora-scripts': 'asahi-scripts', 'aurora-fwextract': 'asahi-fwextract'})
-        both = {'aurora-scripts': {}, 'aurora-fwextract': {}, 'lzfse': {}}
-        self.assertEqual(self.tools(edge_filter.builder_seeds(self.BUILDER, both)), ['aurora-scripts', 'aurora-fwextract'])
-        # aurora-scripts alone keeps asahi-alarm's extractor, which pulls lzfse.
-        self.assertEqual(self.tools(edge_filter.builder_seeds(self.BUILDER, {'aurora-scripts': {}, 'lzfse': {}})),
-                         ['aurora-scripts', 'asahi-fwextract'])
-        # aurora-fwextract without aurora-scripts, or neither, keeps asahi-alarm's pair.
-        for entries in ({'aurora-fwextract': {}}, {}):
-            with self.subTest(sorted(entries)):
-                self.assertEqual(self.tools(edge_filter.builder_seeds(self.BUILDER, entries)),
-                                 ['asahi-scripts', 'asahi-fwextract'])
-
-
 if __name__ == "__main__":
     unittest.main()

@@ -933,68 +933,28 @@ order_set=$scratch/candidate-order
 mkdir -p "$order_set/historical" "$order_set/current" "$order_set/both" "$order_set/none"
 printf '{"packages":[{"name":"omarchy-mac","filename":"omarchy-mac.pkg"}]}\n' >"$order_set/historical/import.json"
 template_archive "$order_set/historical" omarchy-mac.pkg "usr/share/omarchy-mac/pacman/pacman-edge.conf:options asahi-alarm core extra alarm omarchy"
-[[ $(candidate_order "$order_set/historical") == "asahi-alarm core extra alarm omarchy aur" ]] ||
+[[ $(candidate_order "$order_set/historical") == "core extra alarm omarchy aur" ]] ||
   fail "an [omarchy]-last runtime template builds [omarchy] last: $(candidate_order "$order_set/historical")"
 printf '{"packages":[{"name":"omarchy-settings","filename":"settings.pkg"}]}\n' >"$order_set/current/import.json"
 template_archive "$order_set/current" settings.pkg \
   "usr/share/omarchy/default/pacman/aarch64-apple/pacman-edge.conf:options omarchy omarchy-aarch64 asahi-alarm core extra alarm aur"
-[[ $(candidate_order "$order_set/current") == "omarchy asahi-alarm core extra alarm aur" ]] ||
+[[ $(candidate_order "$order_set/current") == "omarchy core extra alarm aur" ]] ||
   fail "an [omarchy]-first template builds [omarchy] first, ignoring unpinned names: $(candidate_order "$order_set/current")"
 printf '{"packages":[{"name":"omarchy","filename":"omarchy.pkg"},{"name":"omarchy-settings","filename":"settings.pkg"}]}\n' >"$order_set/both/import.json"
 template_archive "$order_set/both" omarchy.pkg "usr/share/omarchy/default/pacman/apple-silicon/pacman-edge.conf:asahi-alarm core extra alarm aur omarchy"
 template_archive "$order_set/both" settings.pkg "usr/share/omarchy/default/pacman/aarch64-apple/pacman-edge.conf:omarchy asahi-alarm core extra alarm aur"
-[[ $(candidate_order "$order_set/both") == "omarchy asahi-alarm core extra alarm aur" ]] ||
+[[ $(candidate_order "$order_set/both") == "omarchy core extra alarm aur" ]] ||
   fail "the aarch64-apple template wins over the legacy apple-silicon one, as write_installed_config's lookup: $(candidate_order "$order_set/both")"
 printf '{"packages":[{"name":"omarchy","filename":"omarchy.pkg"}]}\n' >"$order_set/none/import.json"
 template_archive "$order_set/none" omarchy.pkg "usr/share/omarchy/default/pacman/aarch64-apple/pacman-stable.conf:aur omarchy"
-[[ $(candidate_order "$order_set/none") == "omarchy asahi-alarm core extra alarm aur" ]] ||
+[[ $(candidate_order "$order_set/none") == "omarchy core extra alarm aur" ]] ||
   fail "a set with no template for its channel keeps the pinned order: $(candidate_order "$order_set/none")"
 pass "a candidate set builds with its runtime's installed template order, legacy paths included, else the pinned order"
 
-# The Apple tools come from [omarchy] under their aurora names where the lane's
-# pinned database carries them, else under asahi-alarm's (rc and stable before the imports).
-tool_db() { # tool_db <dir> <entry>...: a pinned omarchy.db holding these name-version-release entries
-  local dir=$1 tree=$1/tree entry
-  shift
-  mkdir -p "$tree" "$dir/omarchy"
-  for entry in "$@"; do
-    mkdir -p "$tree/$entry" && : >"$tree/$entry/desc"
-  done
-  (cd "$tree" && bsdtar -czf "$dir/omarchy/omarchy.db" -- *)
-}
-selected_tools() { # selected_tools <repos>: the tool names select_platform_tools and qualified() give for that lane
-  (repos=$1 candidates=$order_set/none; fail() { builder_fail "$@"; }
-    select_platform_tools
-    echo "${PLATFORM_PACKAGES[*]: -2} | $(qualified asahi-scripts aurora-scripts asahi-fwextract aurora-fwextract | paste -sd' ' -)")
-}
-tool_db "$scratch/tools-edge" aurora-scripts-20261023-1 aurora-fwextract-0.9.2-1 lzfse-1.0-2
-[[ $(selected_tools "$scratch/tools-edge") == "aurora-scripts aurora-fwextract | aurora-scripts aurora-scripts aurora-fwextract aurora-fwextract" ]] ||
-  fail "a lane whose [omarchy] carries the tools installs the aurora names: $(selected_tools "$scratch/tools-edge")"
-tool_db "$scratch/tools-rc" aurora-scripts-extra-1-1 omarchy-mac-0.2.3-2
-[[ $(selected_tools "$scratch/tools-rc") == "asahi-scripts asahi-fwextract | asahi-scripts asahi-scripts asahi-fwextract asahi-fwextract" ]] ||
-  fail "a lane whose [omarchy] lacks the tools installs asahi-alarm's names: $(selected_tools "$scratch/tools-rc")"
-tool_db "$scratch/tools-half" aurora-fwextract-0.9.2-1
-[[ $(selected_tools "$scratch/tools-half") == "asahi-scripts asahi-fwextract | asahi-scripts asahi-scripts asahi-fwextract asahi-fwextract" ]] ||
-  fail "aurora-fwextract needs aurora-scripts, so without it the lane keeps asahi-alarm's pair: $(selected_tools "$scratch/tools-half")"
-tool_db "$scratch/tools-scripts" aurora-scripts-20261023-1
-[[ $(selected_tools "$scratch/tools-scripts") == "aurora-scripts asahi-fwextract | aurora-scripts aurora-scripts asahi-fwextract asahi-fwextract" ]] ||
-  fail "aurora-scripts alone is taken, beside asahi-alarm's extractor: $(selected_tools "$scratch/tools-scripts")"
-# A candidate set's own aurora-scripts is the one installed, whatever the lane's [omarchy] carries.
-mkdir -p "$scratch/tools-candidate-set"
-printf '{"packages":[{"name":"aurora-scripts","filename":"scripts.pkg","group":"boot"}]}\n' >"$scratch/tools-candidate-set/import.json"
-tool_db "$scratch/tools-candidate" omarchy-mac-0.2.3-2
-from_set=$(repos=$scratch/tools-candidate candidates=$scratch/tools-candidate-set; fail() { builder_fail "$@"; }
-  select_platform_tools; echo "${PLATFORM_PACKAGES[*]: -2} | $(qualified asahi-scripts aurora-scripts | paste -sd' ' -)")
-[[ $from_set == "aurora-scripts asahi-fwextract | omarchy-candidates/aurora-scripts omarchy-candidates/aurora-scripts" ]] ||
-  fail "a candidate set's aurora-scripts is selected and installed from the set: $from_set"
-# A database written without directory headers, only the desc members.
-mkdir -p "$scratch/tools-flat/omarchy" "$scratch/tools-flat/tree/aurora-scripts-20261023-1" "$scratch/tools-flat/tree/aurora-fwextract-0.9.2-1"
-: >"$scratch/tools-flat/tree/aurora-scripts-20261023-1/desc"
-: >"$scratch/tools-flat/tree/aurora-fwextract-0.9.2-1/desc"
-bsdtar -czf "$scratch/tools-flat/omarchy/omarchy.db" -C "$scratch/tools-flat/tree" aurora-scripts-20261023-1/desc aurora-fwextract-0.9.2-1/desc
-[[ $(selected_tools "$scratch/tools-flat") == "aurora-scripts aurora-fwextract | aurora-scripts aurora-scripts aurora-fwextract aurora-fwextract" ]] ||
-  fail "a database without directory headers still carries the tools: $(selected_tools "$scratch/tools-flat")"
-pass "the Apple tools install as aurora-* where the lane's [omarchy] carries them, else as asahi-*, in every request"
+# The Apple tools are always the aurora builds: a runtime list naming asahi-alarm's names gets them.
+[[ $(candidates=$order_set/none; qualified asahi-scripts asahi-fwextract aurora-scripts | paste -sd' ' -) == "aurora-scripts aurora-fwextract aurora-scripts" ]] ||
+  fail "asahi-alarm's tool names are requested as the aurora builds"
+pass "a runtime list's asahi-scripts and asahi-fwextract install as aurora-scripts and aurora-fwextract"
 
 runtime_template "$(sed '/^\[aur\]/,$d' <<<"$RUNTIME_TEMPLATE")"
 (
